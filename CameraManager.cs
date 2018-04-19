@@ -3,14 +3,8 @@ using System.Collections;
 
 public class CameraManager : MonoBehaviour
 {
-    public GameObject player; // 玉のオブジェクト
-
-    private Vector3 offset; // 玉からカメラまでの距離
-
-    void Start()
-    {
-        offset = transform.position - player.transform.position;
-    }
+    public static GameObject player; // 玉のオブジェクト
+    private Vector3 offset = new Vector3(0f, 10f, -10f);
 
     void LateUpdate()
     {

@@ -9,12 +9,10 @@ public class WebSocketPointManager : MonoBehaviour
     private WebSocket ws;
     private SocketData sendData;
     public GameObject players;
-    public GameObject player;
     private GameObject field;
     public GameObject anotherPlayerPrefab;
-    private bool isHost;
-    private Dictionary<String, GameObject> playerInstansMap = new Dictionary<string, GameObject>();
-    private Dictionary<String, Transform> playerTransformMap = new Dictionary<string, Transform>();
+    public static bool isHost;
+    public static Dictionary<string, SocketData> playerInfoMap = new Dictionary<string, SocketData>();
     // ----------------------------------------------------------------------
     // ゲーム開始時の処理.
     // ----------------------------------------------------------------------
@@ -28,10 +26,6 @@ public class WebSocketPointManager : MonoBehaviour
         field = GameObject.FindGameObjectsWithTag("Field")[0];
 
         isHost = PlayerPrefs.GetString("isHost", "False").Equals("True");
-        if (isHost)
-        {
-            Destroy(player);
-        }
 
         yield return StartCoroutine(ws.Connect());
         yield return 0;
@@ -47,8 +41,9 @@ public class WebSocketPointManager : MonoBehaviour
     // ----------------------------------------------------------------------
     // サーバーに要求を送信する処理.
     // ----------------------------------------------------------------------
-    private void Send(SocketData data)
+    private void Send(string eventName, SocketData data)
     {
+        data.eventName = eventName;
         string json = JsonUtility.ToJson(data);
         //Debug.Log(json);
         ws.SendString(json);
@@ -117,28 +112,25 @@ public class WebSocketPointManager : MonoBehaviour
     // ----------------------------------------------------------------------
     private void Login()
     {
-        sendData.eventName = "login";
-        Send(sendData);
+        Send("login", sendData);
     }
     // ----------------------------------------------------------------------
     // ログインのコールバック処理.
     // ----------------------------------------------------------------------
-    private void LoginCallback(SocketData recieveData)
+    private void LoginCallback(SocketData playerInfo)
     {
         if (sendData.playerId == null)
         {
             //Debug.Log("LoginCallback");
             //Debug.Log(recieveData.positionY);
 
-            sendData = recieveData;
-            sendData.eventName = "loginSuccess";
-            Send(sendData);
+            sendData = playerInfo;
+            Send("loginSuccess", sendData);
 
-            player.GetComponent<Renderer>().material.color = new Color(recieveData.playerColorR, recieveData.playerColorG, recieveData.playerColorB, 1f);
-            player.transform.position = new Vector3(recieveData.positionX, recieveData.positionY, recieveData.positionZ);
-            player.name = recieveData.playerId;
-            player.SetActive(true);
-            playerInstansMap.Add(sendData.playerId, player);
+            GameObject instans = CreatePlayer(playerInfo);
+            playerInfoMap.Add(playerInfo.playerId, playerInfo);
+
+            CameraManager.player = instans;
         }
     }
     // ----------------------------------------------------------------------
@@ -151,10 +143,9 @@ public class WebSocketPointManager : MonoBehaviour
         float z = Input.GetAxis("Vertical");
         if (z == 0) z = Input.acceleration.y;
 
-        sendData.eventName = "setPlayerAction";
         sendData.horizontal = x;
         sendData.vertical = z;
-        Send(sendData);
+        Send("setPlayerAction", sendData);
     }
     // ----------------------------------------------------------------------
     // ゲーム情報取得のコールバック処理.
@@ -181,16 +172,17 @@ public class WebSocketPointManager : MonoBehaviour
     {
         if (recieveData.playerList != null)
         {
-            SocketData playerInfo = null;
-            Transform transform = null;
             int size = recieveData.playerList.Count;
-            for (int i = 0; i < size; i++) // ループをやめる
+            for (int i = 0; i < size; i++)
             {
-                playerInfo = recieveData.playerList[i];
-                transform = GetPlayerTransformById(playerInfo);
-                if (transform)
+                SocketData playerInfo = recieveData.playerList[i];
+                if (playerInfoMap.ContainsKey(playerInfo.playerId))
                 {
-                    transform.position = new Vector3(playerInfo.positionX, playerInfo.positionY, playerInfo.positionZ);
+                    playerInfoMap[playerInfo.playerId] = playerInfo;
+                } else
+                {
+                    playerInfoMap.Add(playerInfo.playerId, playerInfo);
+                    if (!playerInfo.isDelete) CreatePlayer(playerInfo);
                 }
             }
         }
@@ -198,13 +190,14 @@ public class WebSocketPointManager : MonoBehaviour
     // ----------------------------------------------------------------------
     // ユーザー生成処理.
     // ----------------------------------------------------------------------
-    private void CreatePlayer(ref GameObject instans, SocketData playerInfo)
+    private GameObject CreatePlayer(SocketData playerInfo)
     {
-        Debug.Log("createPlayer");
-        instans = Instantiate(anotherPlayerPrefab, new Vector3(playerInfo.positionX, playerInfo.positionY, playerInfo.positionZ), Quaternion.identity);
+        Debug.Log("createPlayer : " + playerInfo.playerId);
+        GameObject instans = Instantiate(anotherPlayerPrefab, new Vector3(playerInfo.positionX, playerInfo.positionY, playerInfo.positionZ), Quaternion.identity);
         instans.GetComponent<Renderer>().material.color = new Color(playerInfo.playerColorR, playerInfo.playerColorG, playerInfo.playerColorB, 1f);
         instans.name = playerInfo.playerId;
         instans.transform.parent = players.transform;
+        return instans;
     }
     // ----------------------------------------------------------------------
     // ホスト情報を送信する処理.
@@ -255,98 +248,7 @@ public class WebSocketPointManager : MonoBehaviour
     // ----------------------------------------------------------------------
     private void SendHostInfoCallback(SocketDataListWrapper recieveData)
     {
-        //Debug.Log("SendHostInfoCallback");
-        //Debug.Log(recieveData);
         SetFieldInfo(recieveData);
-        CalcActions(recieveData);
-    }
-    // ----------------------------------------------------------------------
-    // クライアントの操作状態に基づいた動きを計算する処理.
-    // ----------------------------------------------------------------------
-    private void CalcActions(SocketDataListWrapper recieveData)
-    {
-        if (recieveData.playerList != null)
-        {
-            SocketData playerInfo = null;
-            GameObject instans = null;
-            int size = recieveData.playerList.Count;
-            for (int i = 0; i < size; i++) // ループをやめる
-            {
-                playerInfo = recieveData.playerList[i];
-                instans = GetPlayerById(playerInfo);
-                if (instans)
-                {
-                    Rigidbody rigidbody = instans.GetComponent<Rigidbody>();
-                    rigidbody.AddForce(playerInfo.horizontal * 5, 0, playerInfo.vertical * 5);
-                }
-            }
-        }
-    }
-    // ----------------------------------------------------------------------
-    // プレイヤーIDに基づいて、GameObjectを取得.
-    // ----------------------------------------------------------------------
-    private GameObject GetPlayerById(SocketData playerInfo)
-    {
-        GameObject instans;
-        try
-        {
-            instans = playerInstansMap[playerInfo.playerId];
-        }
-        catch (KeyNotFoundException e)
-        {
-            instans = null;
-        }
-
-        // 削除フラグがONの場合、消す
-        if (playerInfo.isDelete)
-        {
-            if (instans != null)
-            {
-                Destroy(instans);
-            }
-            return null;
-        }
-
-        // インスタンスがない場合、インスタンスを生成
-        if (instans == null)
-        {
-            CreatePlayer(ref instans, playerInfo);
-            if (isHost)
-            {
-                // 重力ON
-                Rigidbody rigidbody = instans.GetComponent<Rigidbody>();
-                rigidbody.useGravity = true;
-                // 衝突判定ON
-                SphereCollider collider = instans.GetComponent<SphereCollider>();
-                collider.enabled = true;
-
-            }
-            playerInstansMap.Add(playerInfo.playerId, instans);
-        }
-        return instans;
-    }
-    // ----------------------------------------------------------------------
-    // プレイヤーIDに基づいて、Transformを取得.
-    // ----------------------------------------------------------------------
-    private Transform GetPlayerTransformById(SocketData playerInfo) {
-        Transform transform;
-        try
-        {
-            transform = playerTransformMap[playerInfo.playerId];
-        }
-        catch (KeyNotFoundException e)
-        {
-            transform = null;
-        }
-        if (transform == null)
-        {
-            GameObject instans = GetPlayerById(playerInfo);
-            if (instans != null)
-            {
-                transform = instans.transform;
-                playerTransformMap.Add(playerInfo.playerId, transform);
-            }
-        }
-        return transform;
+        SetPlayerInfo(recieveData);
     }
 }
