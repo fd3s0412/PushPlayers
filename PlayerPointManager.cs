@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class PlayerPointManager : WebSocketPointManager
+public class PlayerPointManager : MonoBehaviour
 {
     private Transform trans;
     private Rigidbody rigid;
@@ -13,7 +13,7 @@ public class PlayerPointManager : WebSocketPointManager
         trans = transform;
         rigid = GetComponent<Rigidbody>();
 
-        if (isHost)
+        if (WebSocketPointManager.isHost)
         {
             // 重力ON
             Rigidbody rigidbody = GetComponent<Rigidbody>();
@@ -29,7 +29,7 @@ public class PlayerPointManager : WebSocketPointManager
     {
         try
         {
-            SocketData playerInfo = playerInfoMap[this.gameObject.name];
+            SocketData playerInfo = WebSocketPointManager.playerInfoMap[this.gameObject.name];
 
             // 削除フラグがONの場合、消す
             if (playerInfo.isDelete)
@@ -37,7 +37,7 @@ public class PlayerPointManager : WebSocketPointManager
                 Destroy(this.gameObject);
             }
 
-            if (isHost)
+            if (WebSocketPointManager.isHost)
             {
                 rigid.AddForce(playerInfo.horizontal * 5, 0, playerInfo.vertical * 5);
             }
