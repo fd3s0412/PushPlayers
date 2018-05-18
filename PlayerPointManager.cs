@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -13,19 +13,15 @@ public class PlayerPointManager : MonoBehaviour
         trans = transform;
         rigid = GetComponent<Rigidbody>();
 
-        if (WebSocketPointManager.isHost)
-        {
-            // 重力ON
-            Rigidbody rigidbody = GetComponent<Rigidbody>();
-            rigidbody.useGravity = true;
-            // 衝突判定ON
-            SphereCollider collider = GetComponent<SphereCollider>();
-            collider.enabled = true;
-
-        }
+        // 重力ON
+        Rigidbody rigidbody = GetComponent<Rigidbody>();
+        rigidbody.useGravity = true;
+        // 衝突判定ON
+        SphereCollider collider = GetComponent<SphereCollider>();
+        collider.enabled = true;
     }
 
-    void Update()
+    private void Update	()
     {
         try
         {
@@ -44,6 +40,7 @@ public class PlayerPointManager : MonoBehaviour
             else
             {
                 trans.position = new Vector3(playerInfo.positionX, playerInfo.positionY, playerInfo.positionZ);
+                rigid.velocity = new Vector3(playerInfo.velocityX, playerInfo.velocityY, playerInfo.velocityZ);
             }
         }
         catch (Exception e)

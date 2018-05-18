@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -82,9 +82,14 @@ public class WebSocketPointManager : MonoBehaviour
                 GameObject player = playerList[i];
                 SocketData playerData = new SocketData();
                 playerData.playerId = player.name;
-                playerData.positionX = player.transform.position.x;
-                playerData.positionY = player.transform.position.y;
-                playerData.positionZ = player.transform.position.z;
+                Transform trans = player.transform;
+                Rigidbody rigid = player.GetComponent<Rigidbody>();
+                playerData.positionX = trans.position.x;
+                playerData.positionY = trans.position.y;
+                playerData.positionZ = trans.position.z;
+                playerData.velocityX = rigid.velocity.x;
+                playerData.velocityY = rigid.velocity.y;
+                playerData.velocityZ = rigid.velocity.z;
                 playerDataList.Add(playerData);
             }
         }

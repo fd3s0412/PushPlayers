@@ -20,6 +20,10 @@ public class SocketData
     public float positionY;
     public float positionZ;
 
-	public float horizontal;
+    public float velocityX;
+    public float velocityY;
+    public float velocityZ;
+
+    public float horizontal;
 	public float vertical;
 }
